@@ -40,4 +40,20 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
         require(hasRole(AGENT_ROLE, msg.sender), "SuperVault: agent only");
         _;
     }
+
+    function deposit(uint256 amount) external nonReentrant {
+        _deposit(msg.sender, msg.sender, amount, amount);
+    }
+
+    function withdraw(uint256 shares, uint256 minAmount) external nonReentrant {
+        _withdraw(msg.sender, msg.sender, msg.sender, shares, minAmount);
+    }
+
+    function withdraw(uint256 shares) external nonReentrant {
+        _withdraw(msg.sender, msg.sender, msg.sender, shares, 0);
+    }
+
+    function withdrawAll() external nonReentrant {
+        _withdraw(msg.sender, msg.sender, msg.sender, balanceOf(msg.sender), 0);
+    }
 }
