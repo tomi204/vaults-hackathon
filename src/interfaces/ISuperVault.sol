@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./IBalancerV2.sol";
 
 /**
  * @dev Interface for the SuperVault contract.
@@ -19,11 +19,25 @@ interface ISuperVault {
     event StrategyWithdrawal(address indexed strategy, uint256 amount);
     event TokenRegistered(address indexed token);
     event TokenRemoved(address indexed token);
-    event TokenSwapped(
-        address indexed tokenIn,
-        address indexed tokenOut,
-        uint256 amountIn,
-        uint256 amountOut
+    event AddLiquidityToBalancer(
+        bytes32 indexed poolId,
+        IAsset[] assets,
+        uint256[] maxAmountsIn
+    );
+    event WithdrawLiquidityFromBalancer(
+        bytes32 indexed poolId,
+        uint256 exactBptAmountIn,
+        uint256[] minAmountsOut
+    );
+    event Swap(
+        address indexed vaultAddress,
+        IBalancerV2.SingleSwap singleSwap,
+        IBalancerV2.FundManagement funds,
+        uint256 limit,
+        uint256 deadline,
+        uint256 value,
+        uint256 outputReference,
+        uint256 result
     );
 
     // View functions

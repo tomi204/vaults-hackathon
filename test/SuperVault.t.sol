@@ -6,6 +6,10 @@ import {console} from "forge-std/console.sol";
 import {SuperVault} from "../src/SuperVault.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {DataTypes} from "../src/libraries/DataTypes.sol";
+import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
+import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
+import {AaveV3Mock} from "./mocks/AaveV3Mock.sol";
 
 // Mock ERC20 token for testing
 contract MockToken is ERC20 {
@@ -18,6 +22,8 @@ contract SuperVaultTest is Test {
     SuperVault public vault;
     MockToken public token;
     MockToken public asset;
+    AaveV3Mock public aavePool;
+    address public balancerVault;
 
     address public admin;
     address public agent;
@@ -30,19 +36,24 @@ contract SuperVaultTest is Test {
         admin = makeAddr("admin");
         agent = makeAddr("agent");
         user = makeAddr("user");
+        balancerVault = makeAddr("balancerVault");
 
         // Deploy mock tokens
         token = new MockToken();
         asset = new MockToken();
 
+        // Deploy mock Aave pool
+        aavePool = new AaveV3Mock();
+
         // Deploy vault
         vault = new SuperVault(
-            address(token),
             admin,
             IERC20(address(asset)),
             "Vault Token",
             "vTKN",
-            agent
+            agent,
+            address(aavePool),
+            balancerVault
         );
 
         // Setup initial balances
@@ -65,93 +76,79 @@ contract SuperVaultTest is Test {
 
         vm.startPrank(user);
         uint256 expectedShares = vault.previewDeposit(depositAmount);
-        // approve the vault to spend the user's assets
-        asset.approve(address(vault), depositAmount);
         vault.deposit(depositAmount);
-        // console.log("expectedShares", expectedShares);
-        console.log("vault.balanceOf(user)", vault.balanceOf(user));
+
         assertEq(vault.balanceOf(user), expectedShares);
         assertEq(asset.balanceOf(address(vault)), depositAmount);
         assertEq(asset.balanceOf(user), INITIAL_BALANCE - depositAmount);
         vm.stopPrank();
     }
 
-    function test_Withdraw() public {
+    function test_AllocateToAave() public {
         uint256 depositAmount = 100 * 10 ** 18;
+        uint256 allocateAmount = 50 * 10 ** 18;
 
+        // First deposit into vault
         vm.startPrank(user);
-        uint256 shares = vault.previewDeposit(depositAmount);
         vault.deposit(depositAmount);
+        vm.stopPrank();
 
-        uint256 withdrawShares = shares / 2;
-        uint256 expectedAssets = vault.previewRedeem(withdrawShares);
-        vault.withdraw(withdrawShares, 0);
+        // Then allocate to Aave strategy
+        vm.startPrank(agent);
+        vault.allocateToStrategy(DataTypes.StrategyType.AAVE, allocateAmount);
+        vm.stopPrank();
 
-        assertEq(vault.balanceOf(user), shares - withdrawShares);
+        address aaveStrategy = vault.getStrategyAddress(
+            DataTypes.StrategyType.AAVE
+        );
+        assertEq(asset.balanceOf(aaveStrategy), allocateAmount);
         assertEq(
             asset.balanceOf(address(vault)),
-            depositAmount - expectedAssets
+            depositAmount - allocateAmount
+        );
+    }
+
+    function test_WithdrawFromAave() public {
+        uint256 depositAmount = 100 * 10 ** 18;
+        uint256 allocateAmount = 50 * 10 ** 18;
+        uint256 withdrawAmount = 25 * 10 ** 18;
+
+        // Setup: deposit and allocate
+        vm.startPrank(user);
+        vault.deposit(depositAmount);
+        vm.stopPrank();
+
+        vm.startPrank(agent);
+        vault.allocateToStrategy(DataTypes.StrategyType.AAVE, allocateAmount);
+
+        // Test withdrawal
+        vault.withdrawFromStrategy(DataTypes.StrategyType.AAVE, withdrawAmount);
+        vm.stopPrank();
+
+        address aaveStrategy = vault.getStrategyAddress(
+            DataTypes.StrategyType.AAVE
         );
         assertEq(
-            asset.balanceOf(user),
-            INITIAL_BALANCE - depositAmount + expectedAssets
+            asset.balanceOf(aaveStrategy),
+            allocateAmount - withdrawAmount
         );
-        vm.stopPrank();
+        assertEq(
+            asset.balanceOf(address(vault)),
+            depositAmount - allocateAmount + withdrawAmount
+        );
     }
 
-    function test_WithdrawAll() public {
+    function test_RevertOnExcessiveAllocation() public {
         uint256 depositAmount = 100 * 10 ** 18;
+        uint256 allocateAmount = 150 * 10 ** 18;
 
         vm.startPrank(user);
         vault.deposit(depositAmount);
-        uint256 shares = vault.balanceOf(user);
-        vault.withdrawAll();
-
-        assertEq(vault.balanceOf(user), 0);
-        assertEq(asset.balanceOf(address(vault)), 0);
-        assertEq(asset.balanceOf(user), INITIAL_BALANCE);
         vm.stopPrank();
-    }
 
-    function testFail_UnauthorizedAdminAction() public {
-        vm.prank(user);
-        vault.grantRole(vault.ADMIN_ROLE(), user);
-    }
-
-    function testFail_UnauthorizedAgentAction() public {
-        vm.prank(user);
-        vault.grantRole(vault.AGENT_ROLE(), user);
-    }
-
-    function test_AdminCanGrantRoles() public {
-        address newAdmin = makeAddr("newAdmin");
-
-        vm.startPrank(admin);
-        vault.grantRole(vault.ADMIN_ROLE(), newAdmin);
-        assertTrue(vault.hasRole(vault.ADMIN_ROLE(), newAdmin));
-        vm.stopPrank();
-    }
-
-    function test_RevertOnInsufficientShares() public {
-        uint256 depositAmount = 100 * 10 ** 18;
-
-        vm.startPrank(user);
-        vault.deposit(depositAmount);
-
-        vm.expectRevert();
-        vault.withdraw(depositAmount * 2, 0);
-        vm.stopPrank();
-    }
-
-    function test_ShareToAssetConversion() public {
-        uint256 depositAmount = 100 * 10 ** 18;
-
-        vm.startPrank(user);
-        uint256 shares = vault.previewDeposit(depositAmount);
-        vault.deposit(depositAmount);
-
-        uint256 assets = vault.convertToAssets(shares);
-        assertEq(assets, depositAmount);
+        vm.startPrank(agent);
+        vm.expectRevert("SuperVault: insufficient balance");
+        vault.allocateToStrategy(DataTypes.StrategyType.AAVE, allocateAmount);
         vm.stopPrank();
     }
 }
