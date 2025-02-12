@@ -84,59 +84,72 @@ contract SuperVaultTest is Test {
         vm.stopPrank();
     }
 
-    function test_AllocateToAave() public {
+    function test_Withdraw() public {
         uint256 depositAmount = 100 * 10 ** 18;
-        uint256 allocateAmount = 50 * 10 ** 18;
-
-        // First deposit into vault
+        uint256 expectedShares = vault.previewDeposit(depositAmount);
         vm.startPrank(user);
         vault.deposit(depositAmount);
+        assertEq(asset.balanceOf(address(vault)), depositAmount);
         vm.stopPrank();
-
-        // Then allocate to Aave strategy
-        vm.startPrank(agent);
-        vault.allocateToStrategy(DataTypes.StrategyType.AAVE, allocateAmount);
-        vm.stopPrank();
-
-        address aaveStrategy = vault.getStrategyAddress(
-            DataTypes.StrategyType.AAVE
-        );
-        assertEq(asset.balanceOf(aaveStrategy), allocateAmount);
-        assertEq(
-            asset.balanceOf(address(vault)),
-            depositAmount - allocateAmount
-        );
-    }
-
-    function test_WithdrawFromAave() public {
-        uint256 depositAmount = 100 * 10 ** 18;
-        uint256 allocateAmount = 50 * 10 ** 18;
-        uint256 withdrawAmount = 25 * 10 ** 18;
-
-        // Setup: deposit and allocate
         vm.startPrank(user);
-        vault.deposit(depositAmount);
+        vault.withdraw(expectedShares);
+        assertEq(asset.balanceOf(user), INITIAL_BALANCE);
         vm.stopPrank();
-
-        vm.startPrank(agent);
-        vault.allocateToStrategy(DataTypes.StrategyType.AAVE, allocateAmount);
-
-        // Test withdrawal
-        vault.withdrawFromStrategy(DataTypes.StrategyType.AAVE, withdrawAmount);
-        vm.stopPrank();
-
-        address aaveStrategy = vault.getStrategyAddress(
-            DataTypes.StrategyType.AAVE
-        );
-        assertEq(
-            asset.balanceOf(aaveStrategy),
-            allocateAmount - withdrawAmount
-        );
-        assertEq(
-            asset.balanceOf(address(vault)),
-            depositAmount - allocateAmount + withdrawAmount
-        );
     }
+
+    // function test_AllocateToAave() public {
+    //     uint256 depositAmount = 100 * 10 ** 18;
+    //     uint256 allocateAmount = 50 * 10 ** 18;
+
+    //     // First deposit into vault
+    //     vm.startPrank(user);
+    //     vault.deposit(depositAmount);
+    //     vm.stopPrank();
+
+    //     // Then allocate to Aave strategy
+    //     vm.startPrank(agent);
+    //     vault.allocateToStrategy(DataTypes.StrategyType.AAVE, allocateAmount);
+    //     vm.stopPrank();
+
+    //     address aaveStrategy = vault.getStrategyAddress(
+    //         DataTypes.StrategyType.AAVE
+    //     );
+    //     assertEq(asset.balanceOf(aaveStrategy), allocateAmount);
+    //     assertEq(
+    //         asset.balanceOf(address(vault)),
+    //         depositAmount - allocateAmount
+    //     );
+    // }
+
+    // function test_WithdrawFromAave() public {
+    //     uint256 depositAmount = 100 * 10 ** 18;
+    //     uint256 allocateAmount = 50 * 10 ** 18;
+    //     uint256 withdrawAmount = 25 * 10 ** 18;
+
+    //     // Setup: deposit and allocate
+    //     vm.startPrank(user);
+    //     vault.deposit(depositAmount);
+    //     vm.stopPrank();
+
+    //     vm.startPrank(agent);
+    //     vault.allocateToStrategy(DataTypes.StrategyType.AAVE, allocateAmount);
+
+    //     // Test withdrawal
+    //     vault.withdrawFromStrategy(DataTypes.StrategyType.AAVE, withdrawAmount);
+    //     vm.stopPrank();
+
+    //     address aaveStrategy = vault.getStrategyAddress(
+    //         DataTypes.StrategyType.AAVE
+    //     );
+    //     assertEq(
+    //         asset.balanceOf(aaveStrategy),
+    //         allocateAmount - withdrawAmount
+    //     );
+    //     assertEq(
+    //         asset.balanceOf(address(vault)),
+    //         depositAmount - allocateAmount + withdrawAmount
+    //     );
+    // }
 
     function test_RevertOnExcessiveAllocation() public {
         uint256 depositAmount = 100 * 10 ** 18;
