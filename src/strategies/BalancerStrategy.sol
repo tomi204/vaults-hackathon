@@ -13,6 +13,7 @@ contract BalancerStrategy is ILending, AccessControl {
     bytes32 public constant VAULT_ROLE = keccak256("VAULT_ROLE");
     IBalancerV2 public immutable balancerVault;
     mapping(address => uint256) public balancerDeposits;
+    address public vault;
 
     event Deposited(address indexed asset, uint256 amount);
     event Withdrawn(address indexed asset, uint256 amount);
@@ -26,6 +27,7 @@ contract BalancerStrategy is ILending, AccessControl {
         );
         require(_vault != address(0), "BalancerStrategy: zero vault address");
         balancerVault = IBalancerV2(_balancerVault);
+        vault = _vault;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(VAULT_ROLE, _vault);
     }
@@ -94,7 +96,7 @@ contract BalancerStrategy is ILending, AccessControl {
             );
         }
 
-        balancerVault.joinPool(poolId, address(this), address(this), request);
+        balancerVault.joinPool(poolId, address(this), payable(vault), request);
 
         emit LiquidityAdded(poolId, maxAmountsIn);
     }
@@ -113,12 +115,7 @@ contract BalancerStrategy is ILending, AccessControl {
                 toInternalBalance: false
             });
 
-        balancerVault.exitPool(
-            poolId,
-            address(this),
-            payable(msg.sender),
-            request
-        );
+        balancerVault.exitPool(poolId, address(this), payable(vault), request);
 
         emit LiquidityRemoved(poolId, minAmountsOut);
     }

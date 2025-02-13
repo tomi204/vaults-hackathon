@@ -13,6 +13,7 @@ contract AaveStrategy is ILending, AccessControl {
     bytes32 public constant VAULT_ROLE = keccak256("VAULT_ROLE");
     IAaveV3Pool public immutable aavePool;
     mapping(address => uint256) public aaveDeposits;
+    address public vault;
 
     event Deposited(address indexed asset, uint256 amount);
     event Withdrawn(address indexed asset, uint256 amount);
@@ -21,6 +22,7 @@ contract AaveStrategy is ILending, AccessControl {
         require(_aavePool != address(0), "AaveStrategy: zero pool address");
         require(_vault != address(0), "AaveStrategy: zero vault address");
         aavePool = IAaveV3Pool(_aavePool);
+        vault = _vault;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(VAULT_ROLE, _vault);
     }
@@ -37,12 +39,11 @@ contract AaveStrategy is ILending, AccessControl {
         require(amount > 0, "AaveStrategy: zero amount");
 
         // Transfer asset from vault to this contract
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(asset).safeTransferFrom(vault, address(this), amount);
 
         // Approve Aave pool to spend the asset if needed
         IERC20 token = IERC20(asset);
         if (token.allowance(address(this), address(aavePool)) < amount) {
-            token.forceApprove(address(aavePool), 0);
             token.forceApprove(address(aavePool), amount);
         }
 
@@ -80,7 +81,7 @@ contract AaveStrategy is ILending, AccessControl {
         }
 
         // Withdraw from Aave
-        aavePool.withdraw(asset, amount, msg.sender);
+        aavePool.withdraw(asset, amount, payable(vault));
         aaveDeposits[asset] -= amount;
 
         emit Withdrawn(asset, amount);

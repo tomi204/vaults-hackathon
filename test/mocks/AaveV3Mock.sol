@@ -8,6 +8,8 @@ import "../../src/libraries/DataTypes.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract MockAToken is ERC20 {
+    using SafeERC20 for IERC20;
+
     address public immutable underlyingAsset;
     address public immutable pool;
 
@@ -37,6 +39,7 @@ contract AaveV3Mock is IAaveV3Pool {
 
     mapping(address => DataTypes.ReserveData) private _reserves;
     mapping(address => MockAToken) public aTokens;
+    mapping(address => mapping(address => uint256)) private _userBalances;
 
     function supply(
         address asset,
@@ -62,8 +65,9 @@ contract AaveV3Mock is IAaveV3Pool {
         // Transfer asset to this contract
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
 
-        // Mint aTokens to receiver
+        // Mint aTokens to receiver and update balance
         aTokens[asset].mint(onBehalfOf, amount);
+        _userBalances[asset][onBehalfOf] += amount;
     }
 
     function withdraw(
@@ -74,12 +78,13 @@ contract AaveV3Mock is IAaveV3Pool {
         MockAToken aToken = aTokens[asset];
         require(address(aToken) != address(0), "Asset not supported");
         require(
-            aToken.balanceOf(msg.sender) >= amount,
-            "Insufficient aToken balance"
+            _userBalances[asset][msg.sender] >= amount,
+            "Insufficient balance"
         );
 
-        // Burn aTokens
+        // Burn aTokens and update balance
         aToken.burn(msg.sender, amount);
+        _userBalances[asset][msg.sender] -= amount;
 
         // Transfer underlying asset
         IERC20(asset).safeTransfer(to, amount);
@@ -91,5 +96,12 @@ contract AaveV3Mock is IAaveV3Pool {
         address asset
     ) external view override returns (DataTypes.ReserveData memory) {
         return _reserves[asset];
+    }
+
+    function getUserBalance(
+        address asset,
+        address user
+    ) external view returns (uint256) {
+        return _userBalances[asset][user];
     }
 }
