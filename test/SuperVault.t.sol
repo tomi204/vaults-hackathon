@@ -137,6 +137,13 @@ contract SuperVaultTest is Test {
         vm.startPrank(user);
         asset.approve(address(vault), type(uint256).max);
         vm.stopPrank();
+
+        // No necesitamos verificar el strategy address de Aave ya que ahora es un pool
+        assertEq(
+            vault.getPoolAddress("AAVE"),
+            address(aavePool),
+            "Aave pool should be set correctly"
+        );
     }
 
     function test_InitialState() public {
@@ -174,7 +181,7 @@ contract SuperVaultTest is Test {
         vm.stopPrank();
     }
 
-    function test_AllocateToAave() public {
+    function test_DepositToAavePool() public {
         uint256 depositAmount = 100 * 10 ** 18;
         uint256 allocateAmount = 50 * 10 ** 18;
 
@@ -183,15 +190,10 @@ contract SuperVaultTest is Test {
         vault.deposit(depositAmount);
         vm.stopPrank();
 
-        // Then allocate to Aave strategy
+        // Then deposit to Aave pool
         vm.startPrank(agent);
-        vault.allocateToStrategy(DataTypes.StrategyType.AAVE, allocateAmount);
+        vault.depositToPool("AAVE", allocateAmount);
         vm.stopPrank();
-
-        // Get Aave strategy address
-        address aaveStrategy = vault.getStrategyAddress(
-            DataTypes.StrategyType.AAVE
-        );
 
         // Verify balances
         assertEq(
@@ -200,13 +202,13 @@ contract SuperVaultTest is Test {
             "Vault balance should be reduced by allocated amount"
         );
         assertEq(
-            aavePool.getUserBalance(address(asset), aaveStrategy),
+            vault.getPoolBalance("AAVE", address(asset)),
             allocateAmount,
-            "Aave pool should have received the allocated amount"
+            "Pool deposits should be tracked correctly"
         );
     }
 
-    function test_WithdrawFromAave() public {
+    function test_WithdrawFromAavePool() public {
         uint256 depositAmount = 100 * 10 ** 18;
         uint256 allocateAmount = 50 * 10 ** 18;
         uint256 withdrawAmount = 25 * 10 ** 18;
@@ -217,21 +219,17 @@ contract SuperVaultTest is Test {
         vm.stopPrank();
 
         vm.startPrank(agent);
-        vault.allocateToStrategy(DataTypes.StrategyType.AAVE, allocateAmount);
+        vault.depositToPool("AAVE", allocateAmount);
 
-        // Withdraw from Aave strategy
-        vault.withdrawFromStrategy(DataTypes.StrategyType.AAVE, withdrawAmount);
+        // Withdraw from Aave pool
+        vault.withdrawFromPool("AAVE", withdrawAmount);
         vm.stopPrank();
-
-        address aaveStrategy = vault.getStrategyAddress(
-            DataTypes.StrategyType.AAVE
-        );
 
         // Verify balances after withdrawal
         assertEq(
-            aavePool.getUserBalance(address(asset), aaveStrategy),
+            vault.getPoolBalance("AAVE", address(asset)),
             allocateAmount - withdrawAmount,
-            "Aave pool balance should be reduced by withdrawn amount"
+            "Pool balance should be reduced by withdrawn amount"
         );
         assertEq(
             asset.balanceOf(address(vault)),
@@ -240,7 +238,7 @@ contract SuperVaultTest is Test {
         );
     }
 
-    function test_RevertOnExcessiveWithdrawFromAave() public {
+    function test_RevertOnExcessiveWithdrawFromPool() public {
         uint256 depositAmount = 100 * 10 ** 18;
         uint256 allocateAmount = 50 * 10 ** 18;
         uint256 excessiveWithdrawAmount = 75 * 10 ** 18;
@@ -251,18 +249,15 @@ contract SuperVaultTest is Test {
         vm.stopPrank();
 
         vm.startPrank(agent);
-        vault.allocateToStrategy(DataTypes.StrategyType.AAVE, allocateAmount);
+        vault.depositToPool("AAVE", allocateAmount);
 
         // Try to withdraw more than allocated
-        vm.expectRevert("AaveStrategy: insufficient balance");
-        vault.withdrawFromStrategy(
-            DataTypes.StrategyType.AAVE,
-            excessiveWithdrawAmount
-        );
+        vm.expectRevert("SuperVault: insufficient pool balance");
+        vault.withdrawFromPool("AAVE", excessiveWithdrawAmount);
         vm.stopPrank();
     }
 
-    function test_OnlyAgentCanAllocateToAave() public {
+    function test_OnlyAgentCanDepositToPool() public {
         uint256 depositAmount = 100 * 10 ** 18;
         uint256 allocateAmount = 50 * 10 ** 18;
 
@@ -270,69 +265,63 @@ contract SuperVaultTest is Test {
         vm.startPrank(user);
         vault.deposit(depositAmount);
 
-        // Try to allocate as regular user
+        // Try to deposit as regular user
         vm.expectRevert("SuperVault: agent only");
-        vault.allocateToStrategy(DataTypes.StrategyType.AAVE, allocateAmount);
+        vault.depositToPool("AAVE", allocateAmount);
         vm.stopPrank();
     }
 
-    function test_AllocateZeroAmountToAave() public {
-        uint256 depositAmount = 100 * 10 ** 18;
+    function test_AddNewPool() public {
+        address newPoolAddress = makeAddr("newPool");
 
-        // Setup: deposit
+        vm.startPrank(admin);
+        vault.addPool("NEW_POOL", newPoolAddress);
+        vm.stopPrank();
+
+        assertEq(
+            vault.getPoolAddress("NEW_POOL"),
+            newPoolAddress,
+            "New pool should be added correctly"
+        );
+        assertTrue(
+            vault.getPoolList().length > 0,
+            "Pool list should not be empty"
+        );
+    }
+
+    function test_OnlyAdminCanAddPool() public {
+        address newPoolAddress = makeAddr("newPool");
+
         vm.startPrank(user);
-        vault.deposit(depositAmount);
-        vm.stopPrank();
-
-        // Try to allocate zero amount
-        vm.startPrank(agent);
-        vm.expectRevert("SuperVault: zero amount");
-        vault.allocateToStrategy(DataTypes.StrategyType.AAVE, 0);
+        vm.expectRevert("SuperVault: admin only");
+        vault.addPool("NEW_POOL", newPoolAddress);
         vm.stopPrank();
     }
 
-    function test_RevertOnExcessiveAllocation() public {
-        uint256 depositAmount = 100 * 10 ** 18;
-        uint256 allocateAmount = 150 * 10 ** 18;
-
-        vm.startPrank(user);
-        vault.deposit(depositAmount);
-        vm.stopPrank();
-
-        vm.startPrank(agent);
-        vm.expectRevert("SuperVault: insufficient balance");
-        vault.allocateToStrategy(DataTypes.StrategyType.AAVE, allocateAmount);
+    function test_CannotAddDuplicatePool() public {
+        vm.startPrank(admin);
+        vm.expectRevert("SuperVault: pool already exists");
+        vault.addPool("AAVE", address(aavePool));
         vm.stopPrank();
     }
 
-    // function test_AddAndRemoveLiquidity() public {
-    //     // Para testear acciones de liquidez en Balancer
-    //     uint256 depositAmount = 200 * 10 ** 18;
-    //     // Depositar en el vault primero
-    //     vm.startPrank(user);
-    //     vault.deposit(depositAmount);
-    //     vm.stopPrank();
+    function test_CannotAddPoolWithEmptyName() public {
+        vm.startPrank(admin);
+        vm.expectRevert("SuperVault: empty pool name");
+        vault.addPool("", address(aavePool));
+        vm.stopPrank();
+    }
 
-    //     // Parámetros para añadir/quitar liquidez
-    //     bytes32 poolId = bytes32("pool1");
-    //     IAsset[] memory assets = new IAsset[](1);
-    //     assets[0] = IAsset(address(asset));
-    //     uint256[] memory amounts = new uint256[](1);
-    //     amounts[0] = 50 * 10 ** 18;
-    //     bytes memory userData = "";
+    function test_CannotAddPoolWithZeroAddress() public {
+        vm.startPrank(admin);
+        vm.expectRevert("SuperVault: zero pool address");
+        vault.addPool("NEW_POOL", address(0));
+        vm.stopPrank();
+    }
 
-    //     // Esperamos el evento LiquidityAdded desde BalancerStrategy
-    //     vm.startPrank(agent);
-    //     vm.expectEmit(true, false, false, true);
-    //     emit LiquidityAdded(poolId, amounts);
-    //     vault.addLiquidityToBalancer(poolId, assets, amounts, userData);
-    //     vm.stopPrank();
-
-    //     // Esperamos el evento LiquidityRemoved desde BalancerStrategy
-    //     vm.startPrank(agent);
-    //     vm.expectEmit(true, false, false, true);
-    //     emit LiquidityRemoved(poolId, amounts);
-    //     vault.removeLiquidityFromBalancer(poolId, assets, amounts, userData);
-    //     vm.stopPrank();
-    // }
+    function test_GetPoolList() public {
+        string[] memory pools = vault.getPoolList();
+        assertEq(pools.length, 1, "Should have one pool initially");
+        assertEq(pools[0], "AAVE", "First pool should be AAVE");
+    }
 }

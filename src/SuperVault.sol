@@ -10,17 +10,26 @@ import "./interfaces/IAaveV3Pool.sol";
 import "./interfaces/IBalancerV2.sol";
 import "./interfaces/ILending.sol";
 import "./libraries/DataTypes.sol";
-import "./strategies/AaveStrategy.sol";
 import "./strategies/BalancerStrategy.sol";
 
 contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
+
+    struct LendingPool {
+        address poolAddress;
+        bool isActive;
+        mapping(address => uint256) deposits;
+    }
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant AGENT_ROLE = keccak256("AGENT_ROLE");
 
     DataTypes.VaultInfo private vaultInfo;
     mapping(DataTypes.StrategyType => address) public strategies;
+
+    // Mapping para almacenar múltiples pools
+    mapping(string => LendingPool) public lendingPools;
+    string[] public poolList;
 
     event StrategyDeployed(
         DataTypes.StrategyType indexed strategyType,
@@ -32,6 +41,17 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
     );
     event FundsWithdrawn(
         DataTypes.StrategyType indexed strategyType,
+        uint256 amount
+    );
+    event PoolAdded(string indexed poolName, address poolAddress);
+    event PoolDeposit(
+        string indexed poolName,
+        address indexed asset,
+        uint256 amount
+    );
+    event PoolWithdraw(
+        string indexed poolName,
+        address indexed asset,
         uint256 amount
     );
 
@@ -53,7 +73,7 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
         _grantRole(AGENT_ROLE, _agentAddress);
 
         // Deploy strategies
-        AaveStrategy aaveStrategy = new AaveStrategy(_aavePool, address(this));
+        IAaveV3Pool aaveStrategy = IAaveV3Pool(_aavePool);
         strategies[DataTypes.StrategyType.AAVE] = address(aaveStrategy);
         emit StrategyDeployed(
             DataTypes.StrategyType.AAVE,
@@ -69,6 +89,9 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
             DataTypes.StrategyType.BALANCER,
             address(balancerStrategy)
         );
+
+        // Añadir Aave como primer pool
+        _addPool("AAVE", _aavePool);
     }
 
     modifier onlyAdmin() {
@@ -188,5 +211,115 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
         DataTypes.StrategyType strategyType
     ) external view returns (address) {
         return strategies[strategyType];
+    }
+
+    function addPool(
+        string calldata poolName,
+        address poolAddress
+    ) external onlyAdmin {
+        _addPool(poolName, poolAddress);
+    }
+
+    function _addPool(string memory poolName, address poolAddress) internal {
+        require(poolAddress != address(0), "SuperVault: zero pool address");
+        require(
+            !lendingPools[poolName].isActive,
+            "SuperVault: pool already exists"
+        );
+        require(bytes(poolName).length > 0, "SuperVault: empty pool name");
+
+        lendingPools[poolName].poolAddress = poolAddress;
+        lendingPools[poolName].isActive = true;
+        poolList.push(poolName);
+
+        emit PoolAdded(poolName, poolAddress);
+    }
+
+    function depositToPool(
+        string calldata poolName,
+        uint256 amount
+    ) external onlyAgent nonReentrant {
+        require(amount > 0, "SuperVault: zero amount");
+        require(lendingPools[poolName].isActive, "SuperVault: pool not found");
+        require(
+            amount <= IERC20(vaultInfo.asset).balanceOf(address(this)),
+            "SuperVault: insufficient balance"
+        );
+
+        LendingPool storage pool = lendingPools[poolName];
+        address poolAddress = pool.poolAddress;
+
+        IERC20 token = IERC20(vaultInfo.asset);
+        if (token.allowance(address(this), poolAddress) < amount) {
+            token.forceApprove(poolAddress, amount);
+        }
+
+        IAaveV3Pool(poolAddress).supply(
+            vaultInfo.asset,
+            amount,
+            address(this),
+            0
+        );
+        pool.deposits[vaultInfo.asset] += amount;
+        vaultInfo.totalAllocatedFunds += amount;
+
+        emit PoolDeposit(poolName, vaultInfo.asset, amount);
+    }
+
+    function withdrawFromPool(
+        string calldata poolName,
+        uint256 amount
+    ) external onlyAgent nonReentrant {
+        require(amount > 0, "SuperVault: zero amount");
+        require(lendingPools[poolName].isActive, "SuperVault: pool not found");
+
+        LendingPool storage pool = lendingPools[poolName];
+        require(
+            amount <= pool.deposits[vaultInfo.asset],
+            "SuperVault: insufficient pool balance"
+        );
+
+        DataTypes.ReserveData memory reserveData = IAaveV3Pool(pool.poolAddress)
+            .getReserveData(vaultInfo.asset);
+        require(
+            reserveData.aTokenAddress != address(0),
+            "SuperVault: aToken not found"
+        );
+
+        IERC20 aToken = IERC20(reserveData.aTokenAddress);
+        if (aToken.allowance(address(this), pool.poolAddress) < amount) {
+            aToken.forceApprove(pool.poolAddress, 0);
+            aToken.forceApprove(pool.poolAddress, amount);
+        }
+
+        IAaveV3Pool(pool.poolAddress).withdraw(
+            vaultInfo.asset,
+            amount,
+            address(this)
+        );
+        pool.deposits[vaultInfo.asset] -= amount;
+        vaultInfo.totalAllocatedFunds -= amount;
+
+        emit PoolWithdraw(poolName, vaultInfo.asset, amount);
+    }
+
+    // Getters útiles
+    function getPoolBalance(
+        string calldata poolName,
+        address asset
+    ) external view returns (uint256) {
+        require(lendingPools[poolName].isActive, "SuperVault: pool not found");
+        return lendingPools[poolName].deposits[asset];
+    }
+
+    function getPoolAddress(
+        string calldata poolName
+    ) external view returns (address) {
+        require(lendingPools[poolName].isActive, "SuperVault: pool not found");
+        return lendingPools[poolName].poolAddress;
+    }
+
+    function getPoolList() external view returns (string[] memory) {
+        return poolList;
     }
 }
