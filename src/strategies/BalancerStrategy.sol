@@ -62,7 +62,7 @@ contract BalancerStrategy is ILending, AccessControl {
             "BalancerStrategy: insufficient balance"
         );
 
-        IERC20(asset).safeTransfer(msg.sender, amount);
+        IERC20(asset).safeTransfer(vault, amount);
         balancerDeposits[asset] -= amount;
 
         emit Withdrawn(asset, amount);

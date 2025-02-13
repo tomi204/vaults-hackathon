@@ -6,15 +6,14 @@ import "../src/SuperVault.sol";
 
 contract DeploySuperVault is Script {
     function run() external {
-        // Recuperar la private key del ambiente
+        // Retrieve private key from environment variables
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
 
-        // Comenzar broadcast de las transacciones
+        // Start broadcasting transactions
         vm.startBroadcast(deployerPrivateKey);
 
         IERC20 asset = IERC20(vm.envAddress("ASSET_ADDRESS"));
 
-        //
         SuperVault superVault = new SuperVault(
             vm.envAddress("ADMIN_ADDRESS"),
             asset,
@@ -30,7 +29,6 @@ contract DeploySuperVault is Script {
 
         vm.stopBroadcast();
 
-        // Log de la dirección del contrato desplegado
         console.log("SuperVault deployed to:", address(superVault));
     }
 }
