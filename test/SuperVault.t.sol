@@ -12,7 +12,10 @@ import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAd
 import {AaveV3Mock} from "./mocks/AaveV3Mock.sol";
 import {IAsset} from "../src/interfaces/IAsset.sol";
 
-// Definición de la interfaz IBalancerV2 con los structs mínimos necesarios
+/**
+ * @title IBalancerV2 Interface
+ * @dev Minimal interface definition for Balancer V2 with required structs and functions
+ */
 interface IBalancerV2 {
     struct JoinPoolRequest {
         IAsset[] assets;
@@ -20,6 +23,7 @@ interface IBalancerV2 {
         bytes userData;
         bool fromInternalBalance;
     }
+
     struct ExitPoolRequest {
         IAsset[] assets;
         uint256[] minAmountsOut;
@@ -42,7 +46,10 @@ interface IBalancerV2 {
     ) external;
 }
 
-// Implementación mock de BalancerV2
+/**
+ * @title BalancerV2Mock
+ * @dev Mock implementation of BalancerV2 for testing purposes
+ */
 contract BalancerV2Mock is IBalancerV2 {
     event JoinedPool(
         bytes32 poolId,
@@ -50,6 +57,7 @@ contract BalancerV2Mock is IBalancerV2 {
         address recipient,
         uint256[] maxAmountsIn
     );
+
     event ExitedPool(
         bytes32 poolId,
         address sender,
@@ -76,18 +84,26 @@ contract BalancerV2Mock is IBalancerV2 {
     }
 }
 
+/**
+ * @title MockToken
+ * @dev Simple ERC20 token implementation for testing
+ */
 contract MockToken is ERC20 {
     constructor() ERC20("Mock Token", "MTK") {
         _mint(msg.sender, 1000000 * 10 ** decimals());
     }
 }
 
-// Declaramos los eventos de liquidez para testearlos
-// Estos eventos tienen la misma firma que en BalancerStrategy.sol
-// event LiquidityAdded(bytes32 indexed poolId, uint256[] amounts);
-// event LiquidityRemoved(bytes32 indexed poolId, uint256[] amounts);
-
+/**
+ * @title SuperVaultTest
+ * @dev Test suite for SuperVault contract
+ * Tests all main functionalities including deposits, withdrawals, and pool interactions
+ */
 contract SuperVaultTest is Test {
+    // Test events for liquidity actions (matching BalancerStrategy.sol)
+    event LiquidityAdded(bytes32 indexed poolId, uint256[] amounts);
+    event LiquidityRemoved(bytes32 indexed poolId, uint256[] amounts);
+
     SuperVault public vault;
     MockToken public token;
     MockToken public asset;
@@ -100,28 +116,27 @@ contract SuperVaultTest is Test {
 
     uint256 constant INITIAL_BALANCE = 1000 * 10 ** 18;
 
-    // Declaramos los eventos para testear las acciones de liquidez
-    event LiquidityAdded(bytes32 indexed poolId, uint256[] amounts);
-    event LiquidityRemoved(bytes32 indexed poolId, uint256[] amounts);
-
+    /**
+     * @dev Setup function executed before each test
+     */
     function setUp() public {
-        // Configuración de cuentas
+        // Account setup
         admin = makeAddr("admin");
         agent = makeAddr("agent");
         user = makeAddr("user");
 
-        // Desplegamos el mock de Balancer vault
+        // Deploy Balancer mock
         BalancerV2Mock balancerMock = new BalancerV2Mock();
         balancerVault = address(balancerMock);
 
-        // Desplegamos tokens mock
+        // Deploy mock tokens
         token = new MockToken();
         asset = new MockToken();
 
-        // Desplegamos el mock de Aave pool
+        // Deploy Aave pool mock
         aavePool = new AaveV3Mock();
 
-        // Desplegamos el vault
+        // Deploy vault
         vault = new SuperVault(
             admin,
             IERC20(address(asset)),
@@ -132,13 +147,12 @@ contract SuperVaultTest is Test {
             balancerVault
         );
 
-        // Configuramos balances iniciales
+        // Setup initial balances and approvals
         asset.transfer(user, INITIAL_BALANCE);
         vm.startPrank(user);
         asset.approve(address(vault), type(uint256).max);
         vm.stopPrank();
 
-        // No necesitamos verificar el strategy address de Aave ya que ahora es un pool
         assertEq(
             vault.getPoolAddress("AAVE"),
             address(aavePool),
@@ -146,6 +160,9 @@ contract SuperVaultTest is Test {
         );
     }
 
+    /**
+     * @dev Test initial state of the vault
+     */
     function test_InitialState() public {
         assertEq(vault.name(), "Vault Token");
         assertEq(vault.symbol(), "vTKN");
@@ -154,6 +171,9 @@ contract SuperVaultTest is Test {
         assertTrue(vault.hasRole(vault.AGENT_ROLE(), agent));
     }
 
+    /**
+     * @dev Test deposit functionality
+     */
     function test_Deposit() public {
         uint256 depositAmount = 100 * 10 ** 18;
 

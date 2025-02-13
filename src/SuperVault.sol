@@ -12,9 +12,21 @@ import "./interfaces/ILending.sol";
 import "./libraries/DataTypes.sol";
 import "./strategies/BalancerStrategy.sol";
 
+/**
+ * @title SuperVault
+ * @dev A vault contract that manages multiple lending strategies and pools
+ * This contract implements ERC4626 standard for tokenized vaults and includes
+ * integration with Aave V3 and Balancer V2 protocols.
+ */
 contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    /**
+     * @dev Structure to track lending pool information
+     * @param poolAddress Address of the lending pool
+     * @param isActive Status of the pool (active/inactive)
+     * @param deposits Mapping of token address to deposit amount
+     */
     struct LendingPool {
         address poolAddress;
         bool isActive;
@@ -25,9 +37,11 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
     bytes32 public constant AGENT_ROLE = keccak256("AGENT_ROLE");
 
     DataTypes.VaultInfo private vaultInfo;
+
+    // Mapping to store strategy addresses by type
     mapping(DataTypes.StrategyType => address) public strategies;
 
-    // Mapping para almacenar múltiples pools
+    // Mapping to store multiple lending pools
     mapping(string => LendingPool) public lendingPools;
     string[] public poolList;
 
@@ -55,6 +69,16 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
         uint256 amount
     );
 
+    /**
+     * @dev Constructor initializes the vault with initial configurations
+     * @param _admin Address of the admin
+     * @param _asset Address of the underlying asset
+     * @param _name Name of the vault token
+     * @param _symbol Symbol of the vault token
+     * @param _agentAddress Address of the agent
+     * @param _aavePool Address of the Aave pool
+     * @param _balancerVault Address of the Balancer vault
+     */
     constructor(
         address _admin,
         IERC20 _asset,
@@ -104,6 +128,11 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
         _;
     }
 
+    /**
+     * @dev Allocates funds to a specific strategy
+     * @param strategyType Type of strategy to allocate funds to
+     * @param amount Amount of funds to allocate
+     */
     function allocateToStrategy(
         DataTypes.StrategyType strategyType,
         uint256 amount
@@ -201,6 +230,10 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
         _withdraw(msg.sender, msg.sender, msg.sender, balanceOf(msg.sender), 0);
     }
 
+    /**
+     * @dev Returns the total assets managed by the vault
+     * @return Total assets including vault balance and allocated funds
+     */
     function totalAssets() public view virtual override returns (uint256) {
         uint256 vaultBalance = IERC20(asset()).balanceOf(address(this));
         uint256 strategiesBalance = vaultInfo.totalAllocatedFunds;
@@ -303,7 +336,12 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
         emit PoolWithdraw(poolName, vaultInfo.asset, amount);
     }
 
-    // Getters útiles
+    /**
+     * @dev Utility function to get pool balance for a specific asset
+     * @param poolName Name of the pool
+     * @param asset Address of the asset
+     * @return Balance of the asset in the specified pool
+     */
     function getPoolBalance(
         string calldata poolName,
         address asset
