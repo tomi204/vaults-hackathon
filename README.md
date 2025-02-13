@@ -4,10 +4,10 @@
 
 Foundry consists of:
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
+- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
+- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
+- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
 
 ## Documentation
 
@@ -64,4 +64,78 @@ $ forge --help
 $ anvil --help
 $ cast --help
 ```
-# vaults-hackathon
+
+## Vaults Hackathon - Avalanche Integration
+
+SuperVault is an innovative ERC4626-compliant vault system built on Avalanche that leverages artificial intelligence to maximize yield across multiple DeFi protocols. The system's unique architecture ensures capital efficiency by maintaining all assets within the vault contract while dynamically reallocating them between different yield strategies.
+
+### Key Innovation
+
+Our vault implements an AI-powered agent that:
+
+- Continuously monitors yield opportunities across integrated protocols
+- Automatically rebalances assets between strategies for optimal returns
+- Executes all operations within the vault contract, eliminating external transfer risks
+- Makes yield optimization sustainable and reusable through smart contract composability
+
+### Deployed Contracts (Avalanche Mainnet)
+
+| Contract   | Address                                      |
+| ---------- | -------------------------------------------- |
+| SuperVault | `0xc946130d9373b01395c10c63802abdc3fdfca54c` |
+| Asset      | `0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E` |
+
+### Features
+
+- ERC4626-compliant vault for seamless integration with other DeFi protocols
+- AI-driven yield optimization across multiple strategies
+- Automated rebalancing with zero external fund transfers
+- Integration with leading protocols (Aave V3, Balancer V2)
+- Role-based access control for enhanced security
+- Composable architecture enabling strategy reusability
+- Real-time yield optimization through AI agent monitoring
+
+### Development
+
+This project uses Foundry for development and testing. Here's how to get started:
+
+### Deployment
+
+To deploy to Avalanche:
+
+```shell
+$ forge script script/SuperVault.s.sol:DeploySuperVault --rpc-url $AVAX_RPC_URL --broadcast --verify
+```
+
+### Environment Setup
+
+1. Copy `.env.example` to `.env`
+2. Fill in the required variables:
+   ```
+   PRIVATE_KEY=your_private_key
+   RPC_URL=https://api.avax.network/ext/bc/C/rpc
+   AAVE_V3_ADDRESS=0x794a61358D6845594F94dc1DB02A252b5b4814aD
+   BALANCER_V2_ADDRESS=0xBA12222222228d8Ba445958a75a0704d566BF2C8
+   ASSET_ADDRESS=0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E
+   ```
+
+### Testing
+
+```shell
+$ forge test
+```
+
+### Documentation
+
+For detailed documentation about the vault system and its integration with Avalanche, visit our [documentation](https://book.getfoundry.sh/).
+
+### Security
+
+- All contracts are thoroughly tested
+- Role-based access control implemented
+- Emergency pause functionality
+- Timelock for critical operations
+
+### License
+
+This project is licensed under MIT.
