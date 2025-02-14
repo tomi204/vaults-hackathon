@@ -223,7 +223,7 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
     }
 
     function withdraw(uint256 shares) external nonReentrant {
-        _withdraw(msg.sender, msg.sender, msg.sender, shares, 0);
+        _withdraw(msg.sender, msg.sender, msg.sender, shares, shares);
     }
 
     function withdrawAll() external nonReentrant {
