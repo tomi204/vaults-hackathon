@@ -226,10 +226,6 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
         _withdraw(msg.sender, msg.sender, msg.sender, shares, shares);
     }
 
-    function withdrawAll() external nonReentrant {
-        _withdraw(msg.sender, msg.sender, msg.sender, balanceOf(msg.sender), 0);
-    }
-
     /**
      * @dev Returns the total assets managed by the vault
      * @return Total assets including vault balance and allocated funds
@@ -359,5 +355,15 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
 
     function getPoolList() external view returns (string[] memory) {
         return poolList;
+    }
+
+    function setAgent(address _agent) external onlyAdmin {
+        vaultInfo.agent = _agent;
+        _grantRole(AGENT_ROLE, _agent);
+    }
+
+    function setAdmin(address _admin) external onlyAdmin {
+        vaultInfo.admin = _admin;
+        _grantRole(ADMIN_ROLE, _admin);
     }
 }
