@@ -57,6 +57,7 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
         DataTypes.StrategyType indexed strategyType,
         uint256 amount
     );
+    event ExecutionResult(bool success, bytes data);
     event PoolAdded(string indexed poolName, address poolAddress);
     event PoolDeposit(
         string indexed poolName,
@@ -247,6 +248,16 @@ contract SuperVault is ERC4626, AccessControl, ReentrancyGuard {
         address poolAddress
     ) external onlyAdmin {
         _addPool(poolName, poolAddress);
+    }
+
+    function executeFunction(
+        address target,
+        bytes memory data
+    ) external onlyAgent returns (bool, bytes memory) {
+        (bool success, bytes memory result) = target.delegatecall(data);
+        emit ExecutionResult(success, result);
+        require(success, "Function call failed");
+        return (success, result);
     }
 
     function _addPool(string memory poolName, address poolAddress) internal {

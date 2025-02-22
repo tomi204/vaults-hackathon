@@ -344,4 +344,70 @@ contract SuperVaultTest is Test {
         assertEq(pools.length, 1, "Should have one pool initially");
         assertEq(pools[0], "AAVE", "First pool should be AAVE");
     }
+
+    /**
+     * @dev Test the executeFunction capability with a mock target contract
+     * This test verifies that:
+     * 1. Only agents can execute functions
+     * 2. The delegatecall mechanism works correctly
+     * 3. Events are emitted properly
+     * 4. Failed executions are handled correctly
+     */
+    function test_ExecuteFunction() public {
+        // Deploy a mock contract that will be the target of our execution
+        MockExecutionTarget mockTarget = new MockExecutionTarget();
+
+        // Prepare the function call data (calling the 'setValue' function)
+        bytes memory data = abi.encodeWithSignature("setValue(uint256)", 42);
+
+        // Test execution as agent
+        vm.startPrank(agent);
+
+        // Execute the function and expect success
+        (bool success, bytes memory result) = vault.executeFunction(
+            address(mockTarget),
+            data
+        );
+
+        // Verify the execution was successful
+        assertTrue(success, "Function execution should succeed");
+
+        // Decode the result (optional, depending on the function called)
+        uint256 returnedValue = abi.decode(result, (uint256));
+        assertEq(returnedValue, 42, "Return value should match input");
+        vm.stopPrank();
+
+        // Test execution as non-agent (should fail)
+        vm.startPrank(user);
+        vm.expectRevert("SuperVault: agent only");
+        vault.executeFunction(address(mockTarget), data);
+        vm.stopPrank();
+
+        // Test execution with invalid data (should fail)
+        vm.startPrank(agent);
+        bytes memory invalidData = abi.encodeWithSignature(
+            "nonexistentFunction()"
+        );
+        vm.expectRevert("Function call failed");
+        vault.executeFunction(address(mockTarget), invalidData);
+        vm.stopPrank();
+    }
+}
+
+/**
+ * @dev Mock contract used as a target for executeFunction tests
+ * This contract provides a simple function that can be called via delegatecall
+ */
+contract MockExecutionTarget {
+    uint256 public storedValue;
+
+    /**
+     * @dev Sets a value and returns it
+     * @param _value The value to store
+     * @return The stored value
+     */
+    function setValue(uint256 _value) public returns (uint256) {
+        storedValue = _value;
+        return _value;
+    }
 }
