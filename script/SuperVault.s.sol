@@ -20,8 +20,8 @@ contract DeploySuperVault is Script {
             vm.envString("NAME"),
             vm.envString("SYMBOL"),
             vm.envAddress("AGENT_ADDRESS"),
-            vm.envAddress("AAVE_V3_ADDRESS"),
-            vm.envAddress("BALANCER_V2_ADDRESS")
+            vm.envAddress("SILO_FINANCE_ADDRESS"),
+            vm.envAddress("BEETS_V2_ADDRESS")
         );
 
         address superVaultAddress = address(superVault);

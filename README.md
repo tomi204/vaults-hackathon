@@ -65,9 +65,9 @@ $ anvil --help
 $ cast --help
 ```
 
-## Vaults Hackathon - Avalanche Integration
+## Vaults Hackathon - Sonic Integration
 
-SuperVault is an innovative ERC4626-compliant vault system built on Avalanche that leverages artificial intelligence to maximize yield across multiple DeFi protocols. The system's unique architecture ensures capital efficiency by maintaining all assets within the vault contract while dynamically reallocating them between different yield strategies.
+SuperVault is an innovative ERC4626-compliant vault system built on Sonic that leverages artificial intelligence to maximize yield across multiple DeFi protocols. The system's unique architecture ensures capital efficiency by maintaining all assets within the vault contract while dynamically reallocating them between different yield strategies.
 
 ### Key Innovation
 
@@ -78,7 +78,7 @@ Our vault implements an AI-powered agent that:
 - Executes all operations within the vault contract, eliminating external transfer risks
 - Makes yield optimization sustainable and reusable through smart contract composability
 
-### Deployed Contracts (Avalanche Mainnet)
+### Deployed Contracts (Sonic Mainnet)
 
 | Contract   | Address                                      |
 | ---------- | -------------------------------------------- |
@@ -101,10 +101,10 @@ This project uses Foundry for development and testing. Here's how to get started
 
 ### Deployment
 
-To deploy to Avalanche:
+To deploy to Sonic:
 
 ```shell
-$ forge script script/SuperVault.s.sol:DeploySuperVault --rpc-url $AVAX_RPC_URL --broadcast --verify
+$ forge script script/SuperVault.s.sol:DeploySuperVault --rpc-url $SONIC_RPC_URL --broadcast --verify
 ```
 
 ### Environment Setup
@@ -113,10 +113,10 @@ $ forge script script/SuperVault.s.sol:DeploySuperVault --rpc-url $AVAX_RPC_URL 
 2. Fill in the required variables:
    ```
    PRIVATE_KEY=your_private_key
-   RPC_URL=https://api.avax.network/ext/bc/C/rpc
-   AAVE_V3_ADDRESS=0x794a61358D6845594F94dc1DB02A252b5b4814aD
-   BALANCER_V2_ADDRESS=0xBA12222222228d8Ba445958a75a0704d566BF2C8
-   ASSET_ADDRESS=0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E
+   RPC_URL=rpc.soniclabs.com
+   SILO_FINANCE_ADDRESS=0x22AacdEc57b13911dE9f188CF69633cC537BdB76
+   BEETS_V2_ADDRESS=0xBA12222222228d8Ba445958a75a0704d566BF2C8
+   ASSET_ADDRESS=0x29219dd400f2Bf60E5a23d13Be72B486D4038894 (usdc)
    ```
 
 ### Testing
@@ -127,7 +127,7 @@ $ forge test
 
 ### Documentation
 
-For detailed documentation about the vault system and its integration with Avalanche, visit our [documentation](https://book.getfoundry.sh/).
+For detailed documentation about the vault system and its integration with Sonic, visit our [documentation](https://book.getfoundry.sh/).
 
 ### Security
 
