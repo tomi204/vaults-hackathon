@@ -82,8 +82,8 @@ Our vault implements an AI-powered agent that:
 
 | Contract   | Address                                      |
 | ---------- | -------------------------------------------- |
-| SuperVault | `0xc946130d9373b01395c10c63802abdc3fdfca54c` |
-| Asset      | `0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E` |
+| SuperVault | `0x4BdE0740740b8dBb5f6Eb8c9ccB4Fc01171e953C` |
+| Asset      | `0x29219dd400f2Bf60E5a23d13Be72B486D4038894` |
 
 ### Features
 
